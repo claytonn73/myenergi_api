@@ -1,0 +1,58 @@
+[{
+  "eddi": []
+}, {
+  "zappi": [{
+    "dat": "26-03-2021",
+    "tim": "10:11:35",
+    "ectp2": -1,
+    "ectp3": 3,
+    "ectt1": "Internal Load",
+    "ectt2": "None",
+    "ectt3": "None",
+    "frq": 50.04,
+    "gen": 988,
+    "grd": -2,
+    "pha": 1,
+    "sno": 17004596,
+    "sta": 1,
+    "vol": 2448,
+    "pri": 1,
+    "cmt": 254,
+    "zmo": 3,
+    "tbk": 1,
+    "che": 15.89,
+    "pst": "B1",
+    "mgl": 100,
+    "sbh": 12,
+    "sbk": 1,
+    "ectp4": 3,
+    "ectt4": "None",
+    "ectt5": "None",
+    "ectt6": "None",
+    "fwv": "3560S3.103",
+    "dst": 1,
+    "lck": 16
+  }]
+}, {
+  "harvi": [{
+    "sno": 10690095,
+    "dat": "26-03-2021",
+    "tim": "10:11:35",
+    "ectp1": 19,
+    "ectp2": 988,
+    "ectp3": -414,
+    "ectt1": "Grid",
+    "ectt2": "Generation",
+    "ectt3": "AC Battery",
+    "ect1p": 1,
+    "ect2p": 1,
+    "ect3p": 1,
+    "fwv": ""
+  }]
+}, {
+  "asn": "s1.myenergi.net",
+  "fwv": "3401S3051"
+}]
+
+
+

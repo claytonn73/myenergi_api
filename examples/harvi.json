@@ -1,0 +1,17 @@
+{
+  "harvi": [{
+    "sno": 10690095,
+    "dat": "07-11-2020",
+    "tim": "23:59:28",
+    "ectp1": 705,
+    "ectp2": -12,
+    "ectp3": -21,
+    "ectt1": "Grid",
+    "ectt2": "Generation",
+    "ectt3": "AC Battery",
+    "ect1p": 1,
+    "ect2p": 1,
+    "ect3p": 1,
+    "fwv": ""
+  }]
+}
