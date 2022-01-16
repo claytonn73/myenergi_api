@@ -1,1 +1,4 @@
 requests
+dotenv
+influxdb
+argparse
