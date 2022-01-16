@@ -2,10 +2,8 @@
 
 from enum import Enum
 
-MYENERGI_DIRECTOR_URL = "https://director.myenergi.net"
-MYENERGI_API_HEADERS = {'user-agent': 'python/0.0.1'}
-MYENERGI_API_STATUS = "status"
-MYENERGI_API_BOOST_TIMES = "boost_times"
+DIRECTOR_URL = "https://director.myenergi.net"
+API_HEADERS = {'user-agent': 'python/0.0.1'}
 
 
 class MyEnergiEndpoint(Enum):
@@ -33,6 +31,8 @@ class MyenergiType(Enum):
     EDDI = "eddi"
     ZAPPI = "zappi"
     URL = "asn"
+    STATUS = "status"
+    STATUS_TEXT = "statustext"
     FIRMWARE = "fwv"
 
 
@@ -139,6 +139,14 @@ ZappiStateDisplay = {
 ZappiHistoryOption = {
     "Minute", "Hour"
 }
+
+
+class InternalName(Enum):
+    """The strings used for the myenergi devices."""
+
+    HARVI = "_harvi"
+    EDDI = "_eddi"
+    ZAPPI = "_zappi"
 
 
 class ZappiBoost(Enum):

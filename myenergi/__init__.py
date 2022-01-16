@@ -3,7 +3,6 @@
 import logging
 
 from .api import API
-
 # Import constants that are used by external users
 from .const import ZappiMode, ZappiBoostOption
 
