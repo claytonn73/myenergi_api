@@ -16,73 +16,84 @@ import dotenv
 import myenergi
 
 
-def get_logger():
-    """Log messages to the syslog."""
+def setup_logger(destination='stdout') -> logging.Logger:
+    """Sets up a logger instance of the type specified
+    Args:
+        destination (str, optional): The type of logger instance. Defaults to "stdout".
+    Returns:
+        logger : Logger instance of the type specified
+    """
     logger = logging.getLogger()
-    handler = logging.handlers.SysLogHandler(facility=logging.handlers.SysLogHandler.LOG_DAEMON, address='/dev/log')
     logger.setLevel(logging.INFO)
-    logger.addHandler(handler)
-    log_format = 'python[%(process)d]: [%(levelname)s] %(filename)s:%(funcName)s:%(lineno)d \"%(message)s\"'
-    handler.setFormatter(logging.Formatter(fmt=log_format))
+    if destination == 'syslog':
+        """Log messages to the syslog."""
+        handler = logging.handlers.SysLogHandler(facility=logging.handlers.SysLogHandler.LOG_DAEMON, address='/dev/log')
+        logger.addHandler(handler)
+        log_format = 'python[%(process)d]: [%(levelname)s] %(filename)s:%(funcName)s:%(lineno)d \"%(message)s\"'
+        handler.setFormatter(logging.Formatter(fmt=log_format))
+    elif destination == 'stdout':
+        logging.getLogger().addHandler(logging.StreamHandler())
     return logger
 
 
 def valid_time(time_value):
     """Check if the input is a time in the format HHMM."""
     try:
-        datetime.datetime.strptime(time_value, "%H%M")
+        datetime.datetime.strptime(time_value, '%H%M')
     except ValueError:
         msg = "not a valid time: {0!r}".format(time_value)
         raise argparse.ArgumentTypeError(msg)
     return input
 
 
-def get_options():
-    """Get the required options using argparse or from a dotenv file."""
-    env = dotenv.dotenv_values(os.path.expanduser("~/.env"))
+def get_options() -> dict:
+    """Get the required options using argparse with defaults from a dotenv file.
+    Returns:
+        dict: A dictionary of the options to be used.
+    """
+    env = dotenv.dotenv_values(os.path.expanduser('~/.env'))
     parser = argparse.ArgumentParser(description='Starts and stops Zappi boost using the myenergi API.')
-    if "myenergi_serial" not in env:
-        parser.add_argument('-s', '--serial', required=True, help='myenergi hub serial number')
-    if "myenergi_password" not in env:
-        parser.add_argument('-p', '--password', required=True, help='myenergi password')
-    parser.add_argument('-b', '--boost', required=True,
-                        choices=myenergi.ZappiBoostOption, help='boost action')
-    parser.add_argument('-k', '--kwh', required=False, type=float, help='kWh to boost')
-    parser.add_argument('-t', '--time', required=False, type=valid_time,
+    parser.add_argument('-s', '--serial', help='myenergi hub serial number', default=env['myenergi_serial'])
+    parser.add_argument('-p', '--password', help='myenergi password', default=env['myenergi_password'])
+    parser.add_argument('-l', '--logger', help='logging mode', default='syslog', choices=['syslog', 'stdout'])
+    parser.add_argument('-v', '--verbosity', help='logging verbosity', default=logging.INFO)
+    parser.add_argument('-b', '--boost', required=True, choices=myenergi.ZappiBoost._member_names_,
+                        help='boost action to take')
+    parser.add_argument('-z', '--zappi', required=False, type=str, default=None, help='Zappi serial Number to boost')
+    parser.add_argument('-k', '--kwh', required=False, default=None, type=float, help='kWh to boost')
+    parser.add_argument('-t', '--time', required=False, default=None, type=valid_time,
                         help='target time for Smart Boost in format HHMM')
     args = parser.parse_args()
-    if args.boost == "START" and args.kwh is None:
-        parser.error("Boost requested but kWh not provided")
-    if args.boost == "SMART" and (args.kwh is None or args.time is None):
-        parser.error("Smart boost requested but kWh and time not provided")
-    if "myenergi_serial" in env:
-        args.serial = env['myenergi_serial']
-    if "myenergi_password" in env:
-        args.password = env['myenergi_password']
+    if args.boost == myenergi.ZappiBoost.START.name and args.kwh is None:
+        parser.error('Boost requested but kWh not provided')
+    if args.boost == myenergi.ZappiBoost.START.name and args.time is not None:
+        parser.error('Normal boost requested but time provided')
+    if args.boost == myenergi.ZappiBoost.SMART.name and (args.kwh is None or args.time is None):
+        parser.error('Smart boost requested but kWh and time not provided')
+    if args.boost == myenergi.ZappiBoost.STOP.name and (args.kwh is not None or args.time is not None):
+        parser.error('Stop boost requested but unnecessary kWh and time provided')
     return args
 
 
-def main():
+def main() -> None:
     """Set the boost mode as requested."""
-    # Set the logging level for the myenergi api client
-    logging.getLogger('myenergi.api').setLevel(logging.INFO)
-    # Setup the local logger
-    logger = get_logger()
     args = get_options()
+    # Set the logging level for the myenergi api client
+    logging.getLogger('myenergi.api').setLevel(args.verbosity)
+    # Setup the local logger
+    logger = setup_logger(args.logger)
+
     with myenergi.API(args.serial, args.password) as mye:
-        if mye.get_serials("ZAPPI") is None:
-            logger.error("No Zappi Detected")
+        if mye.get_zappi_serials() is None:
+            logger.error('No Zappi Detected')
         else:
-            serial = mye.get_serials("ZAPPI")[0]
-            if args.boost == "START":
-                mye.set_zappi_boost(serial, boost=args.boost, kwh=args.kwh)
-            elif args.boost == "SMART":
-                mye.set_zappi_boost(serial, boost=args.boost, kwh=args.kwh, time=args.time)
-            elif args.boost == "STOP":
-                mye.set_zappi_boost(serial, boost=args.boost)
+            if args.zappi is None:
+                logger.info('No serial number provided. All Zappis will be boosted')
+                for zappi in mye.get_zappi_serials():
+                    mye.set_zappi_boost(zappi, boost=args.boost, kwh=args.kwh, boost_time=args.time)
             else:
-                logger.error("Unknown Boost Command")
+                mye.set_zappi_boost(args.zappi, boost=args.boost, kwh=args.kwh, boost_time=args.time)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

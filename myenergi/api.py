@@ -1,13 +1,28 @@
-"""Module enabling the use of the myenergi API.
+"""This is a Python module that enables the use of the myenergi API.
+This API is provided by the company "myenergi" for querying and controlling their energy-related components,
+such as Zappi, Eddi, Harvi, and Libbi devices.
 
-Provides a range of functions to enable queries and control of myenergi components
+The code defines a class named "API" that provides various methods to interact with the myenergi API.
+
+The class contains several methods to retrieve specific information about the connected devices, such as
+get_zappi_info, get_harvi_info, and get_eddi_info.
+
+There are also methods to refresh the status of a device, set various configurations (e.g., set_zappi_mode,
+set_zappi_boost).
+
+It is also possible to retrieve historical data from the zappi.
+
+Helper Methods: There are internal helper methods such as _api_request for making API calls, _create_url
+for constructing the API URLs, and _check_serial for validating device serial numbers.
 """
 
+import time
 import logging
 import requests
 import requests.auth
+import json
+from datetime import datetime, timedelta
 
-# import const
 import myenergi.error
 from myenergi.const import (
     MyEnergiEndpoint,
@@ -15,13 +30,12 @@ from myenergi.const import (
     ZappiData,
     EddiData,
     HarviData,
-    InternalName,
+    LibbiData,
     ZappiModeParm,
     ZappiBoost,
     ZappiMode,
+    ZappiHistory,
     ZappiStateDisplay,
-    API_HEADERS,
-    DIRECTOR_URL,
 )
 
 # Only export the myenergi API
@@ -30,92 +44,111 @@ __all__ = ["API"]
 
 class API:
     """
-    Class for the myenergi API.
+    A Python module that enables the use of the myenergi API.
 
     Args:
         serial (str): The serial number of the hub
         password (str): The password for the account
     """
 
-    def __init__(self, serial=None, password=None):
-        """Initialise the Myenergi client and perform an initial query."""
+    def __init__(self, serial: str = None, password: str = None) -> None:
+        """Initialise the Myenergi client and perform an initial query.
+
+        Args:
+            serial (str, optional): Serial number of the myenergi hub. Defaults to None.
+            password (str, optional): password for the myenergi hub. Defaults to None.
+        """
         assert serial is not None and password is not None
+        # Setup a logger instance
         self.logger = logging.getLogger(__name__)
-        self.logger.debug("Initialising Myenergi API Client")
+        self.logger.info(f"Initialising Myenergi API Client for hub:{serial}")
+        # Create a session for the API requests
         self._session = requests.Session()
-        self._session.headers.update(API_HEADERS)
+        self._session.headers.update(MyEnergiEndpoint.API_HEADERS.value)
         self._session.auth = requests.auth.HTTPDigestAuth(serial, password)
-        self._eddi = {}
-        self._harvi = {}
-        self._zappi = {}
-        results = self._session.get(DIRECTOR_URL)
-        self._url = f"https://{results.headers['X_MYENERGI-asn']}/"
+        # Call the director URL to get the URL for this hub which is returned in a header field
+        results = self._session.get(MyEnergiEndpoint.DIRECTOR_URL.value)
+        self._url = f"https://{results.headers[MyEnergiEndpoint.ASN_HEADER_FIELD.value]}/"
+        # Perform an initial query to the hub to get the list of devices and their attributes
         results = self._api_request(self._create_url())
+        self._devices = myenergi.const.devices()
         for entry in results.json():
             self._parse_api_results(entry)
+        # Get the boost times for all Zappis
+        for serial in self.get_zappi_serials():
+            self._get_zappi_boost_times(serial)
 
-    def __enter__(self):
+    def __enter__(self) -> "API":
         """Entry function for the myenergi API."""
         return self
 
-    def __exit__(self, exc_type, exc_value, exc_traceback):
+    def __exit__(self, exc_type, exc_value, exc_traceback) -> None:
         """Exit function for the myenergi API."""
         self._session.close()
 
-    def close(self):
+    def close(self) -> None:
         """Close the requests session."""
         self._session.close()
 
-    def get_zappi_info(self, serial, info):
+    def get_zappi_info(self, serial: int, info: ZappiData) -> str:
         """Return the Zappi information previously queried using the API.
 
         Args:
             serial (str): The serial number of the zappi
-            info (str): The human-readable name of the information  to be returned
+            info (ZappiData): The human-readable name of the information  to be returned
         """
-        return self._zappi[serial][ZappiData[info].value]
+        self._check_serial(MyenergiType.ZAPPI, serial)
+        return getattr(self._devices.zappi[serial], info.value)
 
-    def get_zappi_status(self, serial):
+    def get_zappi_status(self, serial: int) -> str:
         """Return the overall charging status of the zappi.
 
         Args:
             serial (str): The serial number of the zappi
         """
-        self._check_serial("ZAPPI", serial)
-        display_status = ZappiStateDisplay[self._zappi[serial][ZappiData["CHARGE_STATUS"].value]
-                                           + str(self._zappi[serial][ZappiData["STATUS"].value])]
+        self._check_serial(MyenergiType.ZAPPI, serial)
+        myzappi = self._devices.zappi[serial]
+        display_status = ZappiStateDisplay[getattr(myzappi, ZappiData.CHARGE_STATUS.value)
+                                           + str(getattr(myzappi, ZappiData.STATUS.value))].value
         return display_status
 
-    def get_harvi_info(self, serial, info):
+    def get_harvi_info(self, serial: int, info: HarviData) -> str:
         """Return the Harvi information previously queried using the API.
 
         Args:
-            serial (str): The serial number of the zappi
-            info (str): The human-readable name of the information  to be returned
+            serial (str): The serial number of the harvi
+            info (HarviData): The human-readable name of the information  to be returned
         """
-        return self._harvi[serial][HarviData[info].value]
+        self._check_serial(MyenergiType.HARVI, serial)
+        return getattr(self._devices.harvi[serial], info.value)
 
-    def get_eddi_info(self, serial, info):
+    def get_eddi_info(self, serial: int, info: EddiData) -> str:
         """Return the Eddi information previously queried using the API.
 
         Args:
-            serial (str): The serial number of the zappi
-            info (str): The human-readable name of the information  to be returned
+            serial (str): The serial number of the eddi
+            info (EddiData): The human-readable name of the information  to be returned
         """
-        return self._eddi[serial][EddiData[info].value]
+        self._check_serial(MyenergiType.EDDI, serial)
+        return getattr(self._devices.eddi[serial], info.value)
 
-    def get_serials(self, device):
+    def get_serials(self, device: MyenergiType) -> list:
+        """Return a list of serial numbers for the device type passed.
+
+        Args:
+            device (MyenergiType): The type of device to return
+        """
+        return getattr(self._devices, device.value).keys()
+
+    def get_zappi_serials(self) -> list:
         """Return a list of serial numbers for the device type passed.
 
         Args:
             device (str): The type of device to return
         """
-        if getattr(self, InternalName[device].value) is None:
-            return None
-        else:
-            return list(getattr(self, InternalName[device].value).keys())
+        return getattr(self._devices, MyenergiType.ZAPPI.value).keys()
 
-    def refresh_status(self, device, serial):
+    def refresh_status(self, device: MyenergiType, serial: str) -> None:
         """Refresh the information stored for a device by calling the myenergi API.
 
         Args:
@@ -123,25 +156,45 @@ class API:
             serial (str): The serial number of the device
         """
         self._check_serial(device, serial)
-        results = self._api_request(self._create_url(endpoint=device, serial=serial))
+        results = self._api_request(self._create_url(endpoint=MyEnergiEndpoint[device.name], serial=serial))
         self._parse_api_results(results.json())
+        if device == MyenergiType.ZAPPI:
+            self._get_zappi_boost_times(serial)
 
-    def get_zappi_boost_times(self, serial):
+    def _get_zappi_boost_times(self, serial: str) -> None:
         """Get the current Zappi boost times.
 
         Args:
             serial (str): The serial number of the zappi
         """
-        self._check_serial("ZAPPI", serial)
-        results = self._api_request(self._create_url(endpoint="ZAPPI_BOOST_TIME", serial=serial))
+        self._check_serial(MyenergiType.ZAPPI, serial)
+        results = self._api_request(self._create_url(endpoint=MyEnergiEndpoint.ZAPPI_BOOST_TIME, serial=serial))
         data = results.json()
-        # Only return boost slots which are populated
-        self._zappi[serial][ZappiData.BOOST_TIMES.value] = []
-        for slot in data.get(ZappiData.BOOST_TIMES.value):
-            if slot["bdd"] != "00000000":
-                self._zappi[serial][ZappiData.BOOST_TIMES.value].append(slot)
+        boost = myenergi.const.boost_times(**data)
+        self._devices.zappi[int(serial)].boost_times = boost.boost_times
 
-    def get_zappi_history(self, serial, history_type, date):
+    def get_zappi_daily_total(self, serial: int, date: str, querydays: int = 1) -> myenergi.const.daily_history:
+        """Get the daily total history information for the date and serial provided
+        Args:
+            serial (int): The serial number of the zappi
+            date (datetime): The date for which to obtain the history
+            querydays (int): The number of days to query counting back from today
+        """
+        self._check_serial(MyenergiType.ZAPPI, serial)
+        daily_history = myenergi.const.daily_history(serial)
+        thedate = datetime.strptime(date, "%Y-%m-%d")
+        for day in range(querydays-1):
+            today = thedate - timedelta(days=day)
+            history = self.get_zappi_history(serial, myenergi.ZappiHistory.HOUR, datetime.strftime(today, "%Y-%m-%d"))
+            summary_data = myenergi.const.daily_data(today)
+            for data in history.history_data:
+                for stat in myenergi.const.ZappiStats:
+                    setattr(summary_data, stat.value, round(getattr(summary_data, stat.value) +
+                                                            getattr(data, stat.value), 2))
+            daily_history.history_data.append(summary_data)
+        return daily_history
+
+    def get_zappi_history(self, serial: str, history_type: ZappiHistory, date: str) -> myenergi.const.hourly_history:
         """Get Zappi history of the relevant type using the Myenergi API.
 
         Args:
@@ -149,125 +202,170 @@ class API:
             history_type (str): Whether to get history by Minute or by Hour
             date (datetime): The date for which to obtain the history
         """
-        self._check_serial("ZAPPI", serial)
-        if history_type == "Minute":
-            history_endpoint = "ZAPPI_HISTORY_MINUTE"
-        elif history_type == "Hour":
-            history_endpoint = "ZAPPI_HISTORY_HOUR"
-        else:
-            raise myenergi.error.ParameterError("Incorrect history type")
-        results = self._api_request(self._create_url(endpoint=history_endpoint, serial=serial,
+        self._check_serial(MyenergiType.ZAPPI, serial)
+        results = self._api_request(self._create_url(endpoint=MyEnergiEndpoint[history_type.value], serial=serial,
                                                      parm=f"-{str(date)}"))
         data = results.json()
-        # Correct error of missing 0 hour in history
         serstring = "U" + str(serial)
-        data[serstring][0]['hr'] = 0
-        return data.get("U" + str(serial))
+        if history_type == ZappiHistory.MINUTE:
+            myhistory = myenergi.const.minute_history(serial)
+            for entry in data[serstring]:
+                myhistory.history_data.append(myenergi.const.minute_data(**entry))
+        elif history_type == ZappiHistory.HOUR:
+            myhistory = myenergi.const.hourly_history(serial)
+            for entry in data[serstring]:
+                myhistory.history_data.append(myenergi.const.hourly_data(**entry))
+        return myhistory
 
-    def set_zappi_minimum_green_limit(self, serial, percentage):
+    def set_zappi_minimum_green_limit(self, serial: str, percentage: int) -> None:
         """Set the Zappi minimum green limit.
 
         Args:
             serial (str): The serial number of the zappi
             percentage (int): The percentage to get the minimum green limit to
         """
-        self._check_serial("ZAPPI", serial)
-        current = self.get_zappi_info(serial, "MINIMUM_GREEN_LIMIT")
-        # set the Zappi minimum green limit as requested
-        self.logger.info("Setting minimum green limit for Zappi SN: %s to %s from %s",
-                         serial, percentage, current)
-        self._api_request(self._create_url(endpoint="ZAPPI_MINGREEN", serial=serial,
-                                           parm=f"-{str(percentage)}"))
+        self._check_serial(MyenergiType.ZAPPI, serial)
+        current_percentage = self.get_zappi_info(serial, ZappiData.MINIMUM_GREEN_LIMIT)
+        if percentage == current_percentage:
+            self.logger.info(f"Minimum green limit for Zappi SN: {serial} is already {percentage}")
+        else:
+            # set the Zappi minimum green limit as requested
+            self.logger.info(f"Setting minimum green limit for Zappi SN:"
+                             f"{serial} to {percentage} from {current_percentage}")
+            self._api_request(self._create_url(endpoint=MyEnergiEndpoint.ZAPPI_MINGREEN, serial=serial,
+                                               parm=f"-{str(percentage)}"))
+            while percentage != self.get_zappi_info(serial, ZappiData.MINIMUM_GREEN_LIMIT):
+                time.sleep(3)
+                self.refresh_status(MyenergiType.ZAPPI, serial)
+            self.logger.info(f"Minimum green limit for Zappi SN:{serial} has been switched to {percentage}")
 
-    def set_zappi_mode(self, serial, mode):
-        """Set the Zappi mode.
+    def set_zappi_mode(self, serial: str, mode: ZappiMode) -> None:
+        """Set the Zappi mode and wait until the mode has changed
 
         Args:
             serial (str): The serial number of the zappi
-            mode (str): The mode to set the Zappi to from the list in ZappiMode
+            mode (ZappiMode): The mode to set the Zappi to from the list in ZappiMode
         """
-        self._check_serial("ZAPPI", serial)
-        current = ZappiMode[self.get_zappi_info(serial, "MODE")]
-        # set the Zappi mode as requested
-        self.logger.info("Setting mode for Zappi SN: %s to %s from %s",
-                         serial, mode, current)
-        self._api_request(self._create_url(endpoint="ZAPPI_MODE", serial=serial,
-                                           parm=f"{ZappiModeParm[mode].value}"))
+        self._check_serial(MyenergiType.ZAPPI, serial)
+        current_mode = self.get_zappi_info(serial, ZappiData.MODE)
+        if ZappiMode[mode].value == current_mode:
+            self.logger.info(f"Mode for Zappi SN: {serial} is already {mode}")
+        else:
+            # set the Zappi mode as requested
+            self.logger.info(f"Setting mode for Zappi SN: {serial} to {mode} from {ZappiMode(current_mode).name}")
+            self._api_request(self._create_url(endpoint=MyEnergiEndpoint.ZAPPI_MODE, serial=serial,
+                                               parm=f"{ZappiModeParm[mode].value}"))
+            start_time = time.monotonic()
+            while ZappiMode[mode].value != self.get_zappi_info(serial, ZappiData.MODE):
+                time.sleep(3)
+                self.refresh_status(MyenergiType.ZAPPI, serial)
+                if time.monotonic() > (start_time + 60):
+                    raise myenergi.error.TimeoutError(f"Timed out waiting for mode for Zappi SN:{serial} to switch")
+            self.logger.info(f"Mode for Zappi SN:{serial} has been switched to {mode}")
 
-    def set_zappi_boost(self, serial, boost="STOP", kwh="", time=""):
-        """Start or stop the Zappi boost."""
-        self._check_serial("ZAPPI", serial)
+    def set_zappi_boost(self, serial: str, boost: ZappiBoost = ZappiBoost.STOP,
+                        kwh: int = 0, boost_time: str = None) -> None:
+        """Start or stop the Zappi boost.
+
+        Args:
+            serial (str): Serial number of the Zappi to boost - or all will be boosted
+            boost (ZappiBoost, optional): Start, Stop or Smart boost. Defaults to ZappiBoost.STOP.
+            kwh (int, optional): kwn to boost. Defaults to 0.
+            boost_time (int, optional): time for smart boost. Defaults to None.
+        """
+        self._check_serial(MyenergiType.ZAPPI, serial)
         # set the Zappi to boost for the desired kWh
-        parm = ""
-        if boost == "START":
+        if boost == ZappiBoost.START.name:
             parm = f"{ZappiBoost[boost].value}{str(kwh)}-0000"
-            self.logger.info("Starting boost for Zappi SN: %s to charge %s KwH",
-                             serial, kwh)
-        elif boost == "SMART":
-            parm = f"{ZappiBoost[boost].value}{str(kwh)}-{str(time)}"
-            self.logger.info("Starting smart boost for Zappi SN: %s to charge %s KwH by %s",
-                             serial, kwh, time)
-        elif boost == "STOP":
+            self.logger.info(f"Starting boost for Zappi SN:{serial} to charge {kwh} kWh")
+        elif boost == ZappiBoost.SMART.name:
+            parm = f"{ZappiBoost[boost].value}{str(kwh)}-{str(boost_time)}"
+            self.logger.info(f"Starting smart boost for Zappi SN: {serial} to charge {kwh} kWh by {boost_time}")
+        elif boost == ZappiBoost.STOP.name:
             parm = f"{ZappiBoost[boost].value}"
-            self.logger.info("Stopping boost for Zappi SN: %s",
-                             serial)
-        self._api_request(self._create_url(endpoint="ZAPPI_MODE", serial=serial, parm=parm))
+            self.logger.info(f"Stopping boost for Zappi SN: {serial}")
+        self._api_request(self._create_url(endpoint=MyEnergiEndpoint.ZAPPI_MODE, serial=serial, parm=parm))
 
-    def _api_request(self, url):
+    def _api_request(self, url: str) -> json:
         try:
-            self.logger.debug("Calling Myenergi API with URL: %s", url)
+            self.logger.debug(f"Calling Myenergi API with URL: {url}")
             results = self._session.get(url)
             # Check the REST API response status
             if results.status_code != requests.codes.ok:
-                self.logger.error("Myenergi API returned status code: %s", results.status_code)
+                self.logger.error(f"Myenergi API returned status code: {results.status_code}")
                 results.raise_for_status()
         except requests.exceptions.HTTPError as err:
+            self.close()
             raise SystemExit(err)
         except requests.exceptions.RequestException as err:
+            self.close()
             raise SystemExit(err)
         # Then check if there is a non-zero status response provided - status is not always returned
         data = results.json()
+        self.logger.debug(f"Formatted API results:\n {json.dumps(data, indent=2)}")
         if MyenergiType.STATUS.value in data:
             if data.get(MyenergiType.STATUS.value) != 0:
-                self.logger.error("Myenergi API returned status: %s",
-                                  data.get(MyenergiType.STATUS.value))
+                self.logger.error(f"Myenergi API returned status: {data.get(MyenergiType.STATUS.value)}")
+                self.close()
                 raise myenergi.error.ResponseError(data.get(MyenergiType.STATUS.value))
         return results
 
-    def _create_url(self, endpoint="DEVICES", serial="", parm=""):
-        url = f"{self._url}{MyEnergiEndpoint[endpoint].value}{serial}{parm}"
+    def _create_url(self, endpoint: MyEnergiEndpoint = MyEnergiEndpoint.DEVICES,
+                    serial: str = "", parm: str = "") -> str:
+        url = f"{self._url}{endpoint.value}{serial}{parm}"
         return url
 
-    def _check_serial(self, device, serial):
-        if getattr(self, InternalName[device].value).get(serial) is None:
-            raise myenergi.error.ParameterError("Serial number does not exist")
+    def _check_serial(self, device: MyenergiType, serial: str) -> None:
+        for key in getattr(self._devices, device.value).keys():
+            if str(key) == str(serial):
+                return
+        raise myenergi.error.ParameterError("Serial number does not exist")
 
-    def _parse_api_results(self, entry):
+    def _parse_api_results(self, entry: json) -> None:
+        """Parses the output of an API call that provides information about myenergi devices
+        The output is loaded into dataclass instances for the different device types
+        which will validate the data received and create a default for missing values
+
+        Args:
+            entry (json): Output from the myenergi API providing device information
+        """
         for key, val in entry.items():
             if key == MyenergiType.EDDI.value:
-                if len(val) > 0:
-                    sno = val[0][EddiData.SERIAL_NUMBER.value]
-                    self.logger.debug("Eddi data discovered with serial number: %s", sno)
-                    self._eddi.update({sno: val[0]})
+                if val:
+                    for device in val:
+                        sno = device[EddiData.SERIAL_NUMBER.value]
+                        self.logger.debug(f"Eddi data discovered with serial number: {sno}")
+                        self._devices.eddi.update({sno: myenergi.const.eddi(**device)})
                 else:
-                    self._eddi = None
+                    self._devices.eddi = None
             elif key == MyenergiType.HARVI.value:
-                if len(val) > 0:
-                    sno = val[0][HarviData.SERIAL_NUMBER.value]
-                    self.logger.debug("Harvi data discovered with serial number: %s", sno)
-                    self._harvi.update({sno: val[0]})
+                if val:
+                    for device in val:
+                        sno = device[HarviData.SERIAL_NUMBER.value]
+                        self.logger.debug(f"Harvi data discovered with serial number: {sno}")
+                        self._devices.harvi.update({sno: myenergi.const.harvi(**device)})
                 else:
-                    self._harvi = None
+                    self._devices.harvi = None
+            elif key == MyenergiType.LIBBI.value:
+                if val:
+                    for device in val:
+                        sno = device[LibbiData.SERIAL_NUMBER.value]
+                        self.logger.debug(f"Libbi data discovered with serial number: {sno}")
+                        self._devices.libbi.update({sno: myenergi.const.libbi(**device)})
+                else:
+                    self._devices.libbi = None
             elif key == MyenergiType.ZAPPI.value:
-                if len(val) > 0:
-                    sno = val[0][ZappiData.SERIAL_NUMBER.value]
-                    self.logger.debug("Zappi data discovered with serial number: %s", sno)
-                    self._zappi.update({sno: val[0]})
+                if val:
+                    for device in val:
+                        sno = device[ZappiData.SERIAL_NUMBER.value]
+                        self.logger.debug(f"Zappi data discovered with serial number: {sno}")
+                        self._devices.zappi.update({sno: myenergi.const.zappi(**device)})
                 else:
-                    self._zappi = None
+                    self._devices.zappi = None
             elif key == MyenergiType.URL.value:
                 self._url = f"https://{val}/"
+                self._devices.asn = val
             elif key == MyenergiType.FIRMWARE.value:
-                self._firmware = val
+                self._devices.fwv = val
             else:
-                self.logger.error("Unknown api results returned: key= %s value= %s", key, val)
+                self.logger.error(f"Unknown api results returned: key= {key} value= {val}")
