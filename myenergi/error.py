@@ -16,9 +16,9 @@ class TimeoutError(MyEnergiError):
 
 class ResponseError(MyEnergiError):
     def __init__(self, error):
-        super().__init__("myenergi nonzero response: {}".format(MyEnergiResponse(int(error))))
+        super().__init__(f"myenergi nonzero response: {MyEnergiResponse(int(error))}")
 
 
 class ParameterError(MyEnergiError):
     def __init__(self, error):
-        super().__init__("myenergi parameter error: {}".format(error))
+        super().__init__(f"myenergi parameter error: {error}")

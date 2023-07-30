@@ -79,6 +79,9 @@ class API:
         # Get the boost times for all Zappis
         for serial in self.get_zappi_serials():
             self._get_zappi_boost_times(serial)
+        # Get the boost times for all Eddis
+        for serial in self.get_serials(MyenergiType.EDDI):
+            self._get_eddi_boost_times(serial)
 
     def __enter__(self) -> "API":
         """Entry function for the myenergi API."""
@@ -140,7 +143,10 @@ class API:
         Args:
             device (MyenergiType): The type of device to return
         """
-        return getattr(self._devices, device.value).keys()
+        if getattr(self._devices, device.value) is not None:
+            return getattr(self._devices, device.value).keys()
+        else:
+            return []
 
     def get_zappi_serials(self) -> list:
         """Return a list of serial numbers for the device type passed.
@@ -148,7 +154,10 @@ class API:
         Args:
             device (str): The type of device to return
         """
-        return getattr(self._devices, MyenergiType.ZAPPI.value).keys()
+        if getattr(self._devices, MyenergiType.ZAPPI.value) is not None:
+            return getattr(self._devices, MyenergiType.ZAPPI.value).keys()
+        else:
+            return []
 
     def refresh_status(self, device: MyenergiType, serial: int) -> None:
         """Refresh the information stored for a device by calling the myenergi API.
@@ -341,17 +350,29 @@ class API:
         self._check_serial(MyenergiType.ZAPPI, serial)
         # set the Zappi to boost for the desired kWh
         if boost == ZappiBoost.START.name:
-            parm = f"{ZappiBoost[boost].value}{str(kwh)}-0000"
-            self.logger.info(f"Starting boost for Zappi SN:{serial} to charge {kwh} kWh")
+            if kwh == 0:
+                raise myenergi.error.ParameterError("START boost specified without required values")
+            else:
+                parm = f"{ZappiBoost[boost].value}{str(kwh)}-0000"
+                self.logger.info(f"Starting boost for Zappi SN:{serial} to charge {kwh} kWh")
         elif boost == ZappiBoost.SMART.name:
-            parm = f"{ZappiBoost[boost].value}{str(kwh)}-{str(boost_time)}"
-            self.logger.info(f"Starting smart boost for Zappi SN: {serial} to charge {kwh} kWh by {boost_time}")
+            if (kwh == 0) or (boost_time is None):
+                raise myenergi.error.ParameterError("SMART boost specified without required values")
+            else:
+                parm = f"{ZappiBoost[boost].value}{str(kwh)}-{str(boost_time)}"
+                self.logger.info(f"Starting smart boost for Zappi SN: {serial} to charge {kwh} kWh by {boost_time}")
         elif boost == ZappiBoost.STOP.name:
             parm = f"{ZappiBoost[boost].value}"
             self.logger.info(f"Stopping boost for Zappi SN: {serial}")
         self._api_request(self._create_url(endpoint=MyEnergiEndpoint.ZAPPI_MODE, serial=serial, parm=parm))
 
     def _api_request(self, url: str) -> json:
+        """Call the REST API with the passed URL and check the response before returning the JSON results.
+        Args:
+            url (str): URL to be passed to the REST API
+        Returns:
+            json: The json returned by the REST API
+        """
         try:
             self.logger.debug(f"Calling Myenergi API with URL: {url}")
             results = self._session.get(url)
@@ -365,9 +386,10 @@ class API:
         except requests.exceptions.RequestException as err:
             self.close()
             raise SystemExit(err)
-        # Then check if there is a non-zero status response provided - status is not always returned
+        # Get the JSON data from the results of the API call.
         data = results.json()
         self.logger.debug(f"Formatted API results:\n {json.dumps(data, indent=2)}")
+        # Then check if there is a non-zero status response provided - status is not always returned
         if MyenergiType.STATUS.value in data:
             if data.get(MyenergiType.STATUS.value) != 0:
                 self.logger.error(f"Myenergi API returned status: {data.get(MyenergiType.STATUS.value)}")
@@ -375,12 +397,25 @@ class API:
                 raise myenergi.error.ResponseError(data.get(MyenergiType.STATUS.value))
         return data
 
-    def _create_url(self, endpoint: MyEnergiEndpoint = MyEnergiEndpoint.DEVICES,
-                    serial: int = "", parm: str = "") -> str:
+    def _create_url(self, serial: str = "", parm: str = "",
+                    endpoint: MyEnergiEndpoint = MyEnergiEndpoint.DEVICES) -> str:
+        """Create a URL for use with the myenergi API
+        Args:
+            endpoint (MyEnergiEndpoint, optional): The REST API endoing to call. Defaults to MyEnergiEndpoint.DEVICES.
+            serial (str): Serial number to be used for the API call.
+            parm (str, optional): Parameter string to be added to the API URL. Defaults to "".
+        Returns:
+            str: The URL to be used
+        """
         url = f"{self._url}{endpoint.value}{serial}{parm}"
         return url
 
     def _check_serial(self, device: MyenergiType, serial: str) -> None:
+        """Check whether the serial number exists and is the type of device specified.
+        Args:
+            device (MyenergiType): The type of device to look for
+            serial (str): the serial number to look for
+        """
         for key in getattr(self._devices, device.value).keys():
             if str(key) == str(serial):
                 return
