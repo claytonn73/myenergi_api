@@ -87,6 +87,7 @@ class ZappiData(Enum):
     CT6_WATTS = "ectp6"
     HISTORY = "history"
     BOOST_TIMES = "boost_times"
+    TIMESTAMP = "timestamp"
 
 
 class LibbiData(Enum):
@@ -129,6 +130,7 @@ class LibbiData(Enum):
     TIME = "tim"
     TIMEZONE = "tz"
     VOLTAGE = "vol"
+    TIMESTAMP = "timestamp"
 
 
 class ZappiModeParm(Enum):
@@ -269,6 +271,7 @@ class EddiData(Enum):
     VOLTAGE = "vol"
     GENERATED_WATTS = "gen"
     GRID_WATTS = "grd"
+    TIMESTAMP = "timestamp"
 
 
 class HarviData(Enum):
@@ -286,6 +289,7 @@ class HarviData(Enum):
     CT1_PHASE = "ect1p"
     CT2_PHASE = "ect2p"
     CT3_PHASE = "ect3p"
+    TIMESTAMP = "timestamp"
 
 
 class MyEnergiResponse(Enum):
@@ -395,7 +399,7 @@ class minute_data:
 @dataclass
 class minute_history:
     """_This dataclass describes the overall structure for minute level history data."""
-    serial: str
+    serial: int
     history_data: list[minute_data] = field(default_factory=list)
 
     def __post_init__(self):
@@ -434,7 +438,7 @@ class hourly_data:
 @dataclass
 class hourly_history:
     """_This dataclass describes the overall structure for hourly history data."""
-    serial: str
+    serial: int
     history_data: list[hourly_data] = field(default_factory=list)
 
     def __post_init__(self):

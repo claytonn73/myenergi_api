@@ -1,0 +1,31 @@
+[build-system]
+requires = [
+    "setuptools>=65",
+    "wheel >= 0.38",
+    "pep517>=0.11",    
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "myenergi"
+version = "1.0.0"
+dependencies = [
+    "requests",
+    "dotenv",
+    "influxdb",
+    "argparse",
+]
+authors = [
+  { name="Nick Clayton", email="nick.m.clayton@gmail.com" },
+]
+description = "API for MyEnergi devices"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/claytonn73/myenergi_api"

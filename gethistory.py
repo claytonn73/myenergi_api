@@ -71,9 +71,8 @@ def main() -> None:
             # For each zappi detected for the account
             for zappiserial in mye.get_serials(myenergi.MyenergiType.ZAPPI):
                 logger.info(f"Adding Myenergi information to influxdb for Zappi S/N: {zappiserial}")
-                thetime = datetime.now()
-                querytime = thetime - timedelta(days=args.end)
-                datestring = querytime.strftime("%Y-%m-%d")
+                starttime = datetime.now() - timedelta(days=args.start)
+                datestring = starttime.strftime("%Y-%m-%d")
                 history = mye.get_zappi_daily_total(zappiserial, datestring, args.end)
                 for entry in history.history_data:
                     # Create data for influxdb and write to database
@@ -89,7 +88,7 @@ def main() -> None:
                         'solar_used': float(getattr(entry, myenergi.ZappiStats.SOLAR_USED.value)),
                         'grid_imported': float(getattr(entry, myenergi.ZappiStats.GRID_IMPORTED.value)),
                         'grid_exported': float(getattr(entry, myenergi.ZappiStats.GRID_EXPORTED.value)),
-                        'month': querytime.strftime("%b %Y"),
+                        'month': datetime.strftime(getattr(entry, "timestamp"), "%b %Y"),
                     }
                     influx_data = [
                         {

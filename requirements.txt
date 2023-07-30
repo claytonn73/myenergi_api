@@ -1,4 +1,0 @@
-requests
-dotenv
-influxdb
-argparse

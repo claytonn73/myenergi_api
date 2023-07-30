@@ -72,7 +72,7 @@ class API:
         # Perform an initial query to the hub to get the list of devices and their attributes
         results = self._api_request(self._create_url())
         self._devices = myenergi.const.devices()
-        for entry in results.json():
+        for entry in results:
             self._parse_api_results(entry)
         # Get the boost times for all Zappis
         for serial in self.get_zappi_serials():
@@ -148,7 +148,7 @@ class API:
         """
         return getattr(self._devices, MyenergiType.ZAPPI.value).keys()
 
-    def refresh_status(self, device: MyenergiType, serial: str) -> None:
+    def refresh_status(self, device: MyenergiType, serial: int) -> None:
         """Refresh the information stored for a device by calling the myenergi API.
 
         Args:
@@ -157,11 +157,11 @@ class API:
         """
         self._check_serial(device, serial)
         results = self._api_request(self._create_url(endpoint=MyEnergiEndpoint[device.name], serial=serial))
-        self._parse_api_results(results.json())
+        self._parse_api_results(results)
         if device == MyenergiType.ZAPPI:
             self._get_zappi_boost_times(serial)
 
-    def _get_zappi_boost_times(self, serial: str) -> None:
+    def _get_zappi_boost_times(self, serial: int) -> None:
         """Get the current Zappi boost times.
 
         Args:
@@ -169,9 +169,8 @@ class API:
         """
         self._check_serial(MyenergiType.ZAPPI, serial)
         results = self._api_request(self._create_url(endpoint=MyEnergiEndpoint.ZAPPI_BOOST_TIME, serial=serial))
-        data = results.json()
-        boost = myenergi.const.boost_times(**data)
-        self._devices.zappi[int(serial)].boost_times = boost.boost_times
+        boost = myenergi.const.boost_times(**results)
+        self._devices.zappi[serial].boost_times = boost.boost_times
 
     def get_zappi_daily_total(self, serial: int, date: str, querydays: int = 1) -> myenergi.const.daily_history:
         """Get the daily total history information for the date and serial provided
@@ -194,7 +193,7 @@ class API:
             daily_history.history_data.append(summary_data)
         return daily_history
 
-    def get_zappi_history(self, serial: str, history_type: ZappiHistory, date: str) -> myenergi.const.hourly_history:
+    def get_zappi_history(self, serial: int, history_type: ZappiHistory, date: str) -> myenergi.const.hourly_history:
         """Get Zappi history of the relevant type using the Myenergi API.
 
         Args:
@@ -205,19 +204,18 @@ class API:
         self._check_serial(MyenergiType.ZAPPI, serial)
         results = self._api_request(self._create_url(endpoint=MyEnergiEndpoint[history_type.value], serial=serial,
                                                      parm=f"-{str(date)}"))
-        data = results.json()
         serstring = "U" + str(serial)
         if history_type == ZappiHistory.MINUTE:
             myhistory = myenergi.const.minute_history(serial)
-            for entry in data[serstring]:
+            for entry in results[serstring]:
                 myhistory.history_data.append(myenergi.const.minute_data(**entry))
         elif history_type == ZappiHistory.HOUR:
             myhistory = myenergi.const.hourly_history(serial)
-            for entry in data[serstring]:
+            for entry in results[serstring]:
                 myhistory.history_data.append(myenergi.const.hourly_data(**entry))
         return myhistory
 
-    def set_zappi_minimum_green_limit(self, serial: str, percentage: int) -> None:
+    def set_zappi_minimum_green_limit(self, serial: int, percentage: int) -> None:
         """Set the Zappi minimum green limit.
 
         Args:
@@ -239,7 +237,7 @@ class API:
                 self.refresh_status(MyenergiType.ZAPPI, serial)
             self.logger.info(f"Minimum green limit for Zappi SN:{serial} has been switched to {percentage}")
 
-    def set_zappi_mode(self, serial: str, mode: ZappiMode) -> None:
+    def set_zappi_mode(self, serial: int, mode: ZappiMode) -> None:
         """Set the Zappi mode and wait until the mode has changed
 
         Args:
@@ -263,7 +261,7 @@ class API:
                     raise myenergi.error.TimeoutError(f"Timed out waiting for mode for Zappi SN:{serial} to switch")
             self.logger.info(f"Mode for Zappi SN:{serial} has been switched to {mode}")
 
-    def set_zappi_boost(self, serial: str, boost: ZappiBoost = ZappiBoost.STOP,
+    def set_zappi_boost(self, serial: int, boost: ZappiBoost = ZappiBoost.STOP,
                         kwh: int = 0, boost_time: str = None) -> None:
         """Start or stop the Zappi boost.
 
@@ -308,10 +306,10 @@ class API:
                 self.logger.error(f"Myenergi API returned status: {data.get(MyenergiType.STATUS.value)}")
                 self.close()
                 raise myenergi.error.ResponseError(data.get(MyenergiType.STATUS.value))
-        return results
+        return data
 
     def _create_url(self, endpoint: MyEnergiEndpoint = MyEnergiEndpoint.DEVICES,
-                    serial: str = "", parm: str = "") -> str:
+                    serial: int = "", parm: str = "") -> str:
         url = f"{self._url}{endpoint.value}{serial}{parm}"
         return url
 
