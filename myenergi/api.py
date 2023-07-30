@@ -34,8 +34,10 @@ from myenergi.const import (
     ZappiModeParm,
     ZappiBoost,
     ZappiMode,
-    ZappiHistory,
+    History,
+    EddiMode,
     ZappiStateDisplay,
+
 )
 
 # Only export the myenergi API
@@ -94,7 +96,7 @@ class API:
         """Return the Zappi information previously queried using the API.
 
         Args:
-            serial (str): The serial number of the zappi
+            serial (int): The serial number of the zappi
             info (ZappiData): The human-readable name of the information  to be returned
         """
         self._check_serial(MyenergiType.ZAPPI, serial)
@@ -104,7 +106,7 @@ class API:
         """Return the overall charging status of the zappi.
 
         Args:
-            serial (str): The serial number of the zappi
+            serial (int): The serial number of the zappi
         """
         self._check_serial(MyenergiType.ZAPPI, serial)
         myzappi = self._devices.zappi[serial]
@@ -116,7 +118,7 @@ class API:
         """Return the Harvi information previously queried using the API.
 
         Args:
-            serial (str): The serial number of the harvi
+            serial (int): The serial number of the harvi
             info (HarviData): The human-readable name of the information  to be returned
         """
         self._check_serial(MyenergiType.HARVI, serial)
@@ -126,7 +128,7 @@ class API:
         """Return the Eddi information previously queried using the API.
 
         Args:
-            serial (str): The serial number of the eddi
+            serial (int): The serial number of the eddi
             info (EddiData): The human-readable name of the information  to be returned
         """
         self._check_serial(MyenergiType.EDDI, serial)
@@ -153,23 +155,36 @@ class API:
 
         Args:
             device (str): The type of device to return
-            serial (str): The serial number of the device
+            serial (int): The serial number of the device
         """
         self._check_serial(device, serial)
         results = self._api_request(self._create_url(endpoint=MyEnergiEndpoint[device.name], serial=serial))
         self._parse_api_results(results)
         if device == MyenergiType.ZAPPI:
             self._get_zappi_boost_times(serial)
+        if device == MyenergiType.EDDI:
+            self._get_eddi_boost_times(serial)
+
+    def _get_eddi_boost_times(self, serial: int) -> None:
+        """Get the current Eddi boost times.
+
+        Args:
+            serial (int): The serial number of the Eddi
+        """
+        self._check_serial(MyenergiType.EDDI, serial)
+        results = self._api_request(self._create_url(endpoint=MyEnergiEndpoint.EDDI_BOOST_TIME, serial=serial))
+        boost = myenergi.const.boosttimes(**results)
+        self._devices.eddi[serial].boost_times = boost.boost_times
 
     def _get_zappi_boost_times(self, serial: int) -> None:
         """Get the current Zappi boost times.
 
         Args:
-            serial (str): The serial number of the zappi
+            serial (int): The serial number of the zappi
         """
         self._check_serial(MyenergiType.ZAPPI, serial)
         results = self._api_request(self._create_url(endpoint=MyEnergiEndpoint.ZAPPI_BOOST_TIME, serial=serial))
-        boost = myenergi.const.boost_times(**results)
+        boost = myenergi.const.boosttimes(**results)
         self._devices.zappi[serial].boost_times = boost.boost_times
 
     def get_zappi_daily_total(self, serial: int, date: str, querydays: int = 1) -> myenergi.const.daily_history:
@@ -184,7 +199,7 @@ class API:
         thedate = datetime.strptime(date, "%Y-%m-%d")
         for day in range(querydays-1):
             today = thedate - timedelta(days=day)
-            history = self.get_zappi_history(serial, myenergi.ZappiHistory.HOUR, datetime.strftime(today, "%Y-%m-%d"))
+            history = self.get_zappi_history(serial, History.HOUR, datetime.strftime(today, "%Y-%m-%d"))
             summary_data = myenergi.const.daily_data(today)
             for data in history.history_data:
                 for stat in myenergi.const.ZappiStats:
@@ -193,11 +208,33 @@ class API:
             daily_history.history_data.append(summary_data)
         return daily_history
 
-    def get_zappi_history(self, serial: int, history_type: ZappiHistory, date: str) -> myenergi.const.hourly_history:
+    def get_eddi_history(self, serial: int, history_type: History, date: str) -> myenergi.const.hourly_history:
+        """Get Eddi history of the relevant type using the Myenergi API.
+
+        Args:
+            serial (int): The serial number of the eddi
+            history_type (str): Whether to get history by Minute or by Hour
+            date (datetime): The date for which to obtain the history
+        """
+        self._check_serial(MyenergiType.EDDI, serial)
+        results = self._api_request(self._create_url(endpoint=MyEnergiEndpoint[history_type.value], serial=serial,
+                                                     parm=f"-{str(date)}"))
+        serstring = "U" + str(serial)
+        if history_type == History.MINUTE:
+            myhistory = myenergi.const.minute_history(serial)
+            for entry in results[serstring]:
+                myhistory.history_data.append(myenergi.const.minute_data(**entry))
+        elif history_type == History.HOUR:
+            myhistory = myenergi.const.hourly_history(serial)
+            for entry in results[serstring]:
+                myhistory.history_data.append(myenergi.const.hourly_data(**entry))
+        return myhistory
+
+    def get_zappi_history(self, serial: int, history_type: History, date: str) -> myenergi.const.hourly_history:
         """Get Zappi history of the relevant type using the Myenergi API.
 
         Args:
-            serial (str): The serial number of the zappi
+            serial (int): The serial number of the zappi
             history_type (str): Whether to get history by Minute or by Hour
             date (datetime): The date for which to obtain the history
         """
@@ -205,11 +242,11 @@ class API:
         results = self._api_request(self._create_url(endpoint=MyEnergiEndpoint[history_type.value], serial=serial,
                                                      parm=f"-{str(date)}"))
         serstring = "U" + str(serial)
-        if history_type == ZappiHistory.MINUTE:
+        if history_type == History.MINUTE:
             myhistory = myenergi.const.minute_history(serial)
             for entry in results[serstring]:
                 myhistory.history_data.append(myenergi.const.minute_data(**entry))
-        elif history_type == ZappiHistory.HOUR:
+        elif history_type == History.HOUR:
             myhistory = myenergi.const.hourly_history(serial)
             for entry in results[serstring]:
                 myhistory.history_data.append(myenergi.const.hourly_data(**entry))
@@ -219,7 +256,7 @@ class API:
         """Set the Zappi minimum green limit.
 
         Args:
-            serial (str): The serial number of the zappi
+            serial (int): The serial number of the zappi
             percentage (int): The percentage to get the minimum green limit to
         """
         self._check_serial(MyenergiType.ZAPPI, serial)
@@ -237,11 +274,23 @@ class API:
                 self.refresh_status(MyenergiType.ZAPPI, serial)
             self.logger.info(f"Minimum green limit for Zappi SN:{serial} has been switched to {percentage}")
 
+    def set_eddi_mode(self, serial: int, mode: EddiMode) -> None:
+        """Set the Zappi mode and wait until the mode has changed
+
+        Args:
+            serial (int): The serial number of the Eddi
+            mode (ZappiMode): The mode to set the Eddi to from the list in ZappiMode
+        """
+        self._check_serial(MyenergiType.EDDI, serial)
+        self.logger.info(f"Setting mode for Eddi SN: {serial} to {mode.name}")
+        self._api_request(self._create_url(endpoint=MyEnergiEndpoint.EDDI_MODE, serial=serial,
+                                           parm=f"{mode.value}"))
+
     def set_zappi_mode(self, serial: int, mode: ZappiMode) -> None:
         """Set the Zappi mode and wait until the mode has changed
 
         Args:
-            serial (str): The serial number of the zappi
+            serial (int): The serial number of the zappi
             mode (ZappiMode): The mode to set the Zappi to from the list in ZappiMode
         """
         self._check_serial(MyenergiType.ZAPPI, serial)
@@ -261,12 +310,30 @@ class API:
                     raise myenergi.error.TimeoutError(f"Timed out waiting for mode for Zappi SN:{serial} to switch")
             self.logger.info(f"Mode for Zappi SN:{serial} has been switched to {mode}")
 
+    def set_eddi_boost(self, serial: int, heater: int = 1, boost_time: int = 0) -> None:
+        """Start or stop the Eddi boost.
+
+        Args:
+            serial (int): Serial number of the Zappi to boost - or all will be boosted
+            heater (int) : Number of the heater to boost
+            boost_time (int, optional): time for boost. Defaults to 0 which cancels boost
+        """
+        self._check_serial(MyenergiType.ZAPPI, serial)
+        # set the Zappi to boost for the desired kWh
+        if boost_time == 0:
+            parm = f"-1-{heater}-{boost_time}"
+            self.logger.info(f"Stopping boost for Eddi SN: {serial}")
+        else:
+            parm = f"-10-{heater}-{boost_time}"
+            self.logger.info(f"Starting boost for Eddi SN:{serial} for {boost_time} minutes")
+        self._api_request(self._create_url(endpoint=MyEnergiEndpoint.EDDI_BOOST, serial=serial, parm=parm))
+
     def set_zappi_boost(self, serial: int, boost: ZappiBoost = ZappiBoost.STOP,
                         kwh: int = 0, boost_time: str = None) -> None:
         """Start or stop the Zappi boost.
 
         Args:
-            serial (str): Serial number of the Zappi to boost - or all will be boosted
+            serial (int): Serial number of the Zappi to boost - or all will be boosted
             boost (ZappiBoost, optional): Start, Stop or Smart boost. Defaults to ZappiBoost.STOP.
             kwh (int, optional): kwn to boost. Defaults to 0.
             boost_time (int, optional): time for smart boost. Defaults to None.

@@ -1,14 +1,26 @@
-"""Provide constants used by the myenergi API."""
+"""Provide constants and dataclasses used by the myenergi API."""
 
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from enum import Enum
 
 
+class WeekDay(Enum):
+    """Human readable names for the days of the week returned in the history statistics."""
+    MONDAY = 'Mon'
+    TUESDAY = 'Tue'
+    WEDNESDAY = 'Wed'
+    THURSDAY = 'Thu'
+    FRIDAY = 'Fri'
+    SATURDAY = 'Sat'
+    SUNDAY = 'Sun'
+
+
 class MyEnergiEndpoint(Enum):
     """Supported endpoints for the Myenergi API and related constants."""
     DEVICES = "cgi-jstatus-*"
     HARVI = "cgi-jstatus-H"
+    LIBBI = "cgi-jstatus-L"
     ZAPPI = "cgi-jstatus-Z"
     ZAPPI_MODE = "cgi-zappi-mode-Z"
     ZAPPI_MINGREEN = "cgi-set-min-green-Z"
@@ -17,12 +29,45 @@ class MyEnergiEndpoint(Enum):
     ZAPPI_HISTORY_HOUR = "cgi-jdayhour-Z"
     EDDI = "cgi-jstatus-E"
     EDDI_PRIORITY = "cgi-set-heater-priority-E"
-    EDDI_HISTORY_DAY = "cgi-jday-E"
+    EDDI_HISTORY_MINUTE = "cgi-jhour-E"
+    EDDI_HISTORY_HOUR = "cgi-jday-E"
     EDDI_BOOST_TIME = "cgi-boost-time-E"
     EDDI_BOOST = "cgi-eddi-boost-E"
     DIRECTOR_URL = "https://director.myenergi.net"
     API_HEADERS = {'user-agent': 'python/0.0.1'}
     ASN_HEADER_FIELD = 'X_MYENERGI-asn'
+
+
+class MyEnergiResponse(Enum):
+    """A list of the return codes for the myenergi API and the human readable meaning."""
+    Success = 0
+    InvalidID = -1
+    InvalidDSRCommandSequenceNumber = -2
+    NoActionTakenCommandSequenceNumberSameAsLast = -3
+    HubNotFoundNoAssociatedHubRecord = -4
+    InternalError = -5
+    InvalidLoadValue = -6
+    YearMissing = -7
+    MonthMissingOrInvalid = -8
+    DayMissingOrInvalid = -9
+    HourMissingOrInvalid = -10
+    InvalidTTLValue = -11
+    UserNotAuthorizedToPerformOperation = -12
+    SerialNumberNotFound = -13
+    MissingOrBadParameter = -14
+    InvalidPassword = -15
+    NewPasswordsDoNotMatch = -16
+    InvalidNewPassword = -17
+    NewPasswordSameAsOldPassword = -18
+    UserNotRegistered = -19
+    MinuteMissingOrInvalid = -20
+    SlotMissingOrInvalid = -21
+    PriorityBadOrMissing = -22
+    CommandNotAppropriateForDevice = -23
+    CheckPeriodBadOrMissing = -24
+    MinGreenLevelBadOrMissing = -25
+    BusyServerAlreadySendingCommandToDevice = -26
+    RelayNotFitted = -27
 
 
 class MyenergiType(Enum):
@@ -47,10 +92,107 @@ class LoadTypes(Enum):
     NONE = "None"
 
 
-class ZappiHistory(Enum):
-    """Types of history data that can be requested for the Zappi."""
+class History(Enum):
+    """Types of history data that can be requested for the Zappi or Eddi."""
     MINUTE = "ZAPPI_HISTORY_MINUTE"
     HOUR = "ZAPPI_HISTORY_HOUR"
+
+
+class EddiData(Enum):
+    """Data returned for the Eddi."""
+    DATE = "dat"
+    TIME = "time"
+    SERIAL_NUMBER = "sno"
+    FREQUENCY = "frq"
+    VOLTAGE = "vol"
+    GENERATED_WATTS = "gen"
+    GRID_WATTS = "grd"
+    TIMESTAMP = "timestamp"
+    CT1_NAME = "ectt1"
+    CT2_NAME = "ectt2"
+    CT1_WATTS = "ectp1"
+    CT2_WATTS = "ectp2"
+    STATUS = "sta"
+    ACTIVE_HEATER = "hno"
+    PHASE = "pha"
+    HEATER_1 = "ht1"
+    HEATER_2 = "ht2"
+    TEMPERATURE_1 = "tp1"
+    TEMPERATURE_2 = "tp2"
+    PRIORITY = "pri"
+    COMMAND_TIMER = "cmt"
+    R1A = "r1a"
+    R2A = "r2a"
+    R2B = "r2b"
+    REMAINING_BOOST = "rbt"
+    HEATING_KWH = "che"
+
+
+class EddiMode(Enum):
+    """Numeric values of different Eddi modes."""
+    STOPPED = 0
+    NORMAL = 1
+
+
+class HarviData(Enum):
+    """Data returned for the Harvi."""
+    DATE = "dat"
+    TIME = "time"
+    SERIAL_NUMBER = "sno"
+    FIRMWARE_VERSION = "fwv"
+    CT1_NAME = "ectt1"
+    CT2_NAME = "ectt2"
+    CT3_NAME = "ectt3"
+    CT1_WATTS = "ectp1"
+    CT2_WATTS = "ectp2"
+    CT3_WATTS = "ectp3"
+    CT1_PHASE = "ect1p"
+    CT2_PHASE = "ect2p"
+    CT3_PHASE = "ect3p"
+    TIMESTAMP = "timestamp"
+
+
+class LibbiData(Enum):
+    """Data returned for the Libbi."""
+    batteryDischargingBoost = "batteryDischargingBoost"
+    CMT = "cmt"
+    DATE = "dat"
+    DIVERTED_WATTS = "div"
+    DST = "dst"
+    CT1_PHASE = "ect1p"
+    CT2_PHASE = "ect2p"
+    CT3_PHASE = "ect3p"
+    CT1_WATTS = "ectp1"
+    CT2_WATTS = "ectp2"
+    CT3_WATTS = "ectp3"
+    CT4_WATTS = "ectp4"
+    CT5_WATTS = "ectp5"
+    CT1_NAME = "ectt1"
+    CT2_NAME = "ectt2"
+    CT3_NAME = "ectt3"
+    CT4_NAME = "ectt4"
+    CT5_NAME = "ectt5"
+    CT6_NAME = "ectt6"
+    FREQUENCY = "frq"
+    FIRMWARE = "fwv"
+    g100LockoutState = "g100LockoutState"
+    GRID_WATTTS = "grd"
+    ISP = "isp"
+    MODE = "lmo"
+    MBC = "mbc"
+    MIC = "mic"
+    newAppAvailable = "newAppAvailable"
+    newBootloaderAvailable = "newBootloaderAvailable"
+    PHASE = "pha"
+    PRIORITY = "pri"
+    pvDirectlyConnected = "pvDirectlyConnected"
+    SERIAL_NUMBER = "sno"
+    SOC = "soc"
+    STATUS = "sta"
+    TIME = "tim"
+    TIMEZONE = "tz"
+    VOLTAGE = "vol"
+    TIMESTAMP = "timestamp"
 
 
 class ZappiData(Enum):
@@ -87,49 +229,6 @@ class ZappiData(Enum):
     CT6_WATTS = "ectp6"
     HISTORY = "history"
     BOOST_TIMES = "boost_times"
-    TIMESTAMP = "timestamp"
-
-
-class LibbiData(Enum):
-    """Data returned for the Libbi."""
-    # "batteryDischargingBoost": false,
-    # "cmt": 254,
-    DATE = "dat"
-    DIVERTED_WATTS = "div"
-    # "dst": 1,
-    CT1_PHASE = "ect1p"
-    CT2_PHASE = "ect2p"
-    CT3_PHASE = "ect3p"
-    CT1_WATTS = "ectp1"
-    CT2_WATTS = "ectp2"
-    CT3_WATTS = "ectp3"
-    CT4_WATTS = "ectp4"
-    CT5_WATTS = "ectp5"
-    CT1_NAME = "ectt1"
-    CT2_NAME = "ectt2"
-    CT3_NAME = "ectt3"
-    CT4_NAME = "ectt4"
-    CT5_NAME = "ectt5"
-    CT6_NAME = "ectt6"
-    FREQUENCY = "frq"
-    FIRMWARE = "fwv"
-    # "g100LockoutState": "NONE",
-    GRID_WATTTS = "grd"
-    # "isp": true,
-    MODE = "lmo"
-    # "mbc": 10200,
-    # "mic": 5000,
-    # "newAppAvailable": false,
-    # "newBootloaderAvailable": false,
-    PHASE = "pha"
-    # "pri": 1,
-    # "pvDirectlyConnected": true,
-    SERIAL_NUMBER = "sno"
-    # "soc": 2,
-    # "sta": 101,
-    TIME = "tim"
-    TIMEZONE = "tz"
-    VOLTAGE = "vol"
     TIMESTAMP = "timestamp"
 
 
@@ -252,87 +351,14 @@ class ZappiBoost(Enum):
     STOP = "-0-2-0-0000"
 
 
-class ZappiBoostTime(Enum):
-    """Human readable names for the Zappi boost data response."""
+class BoostTime(Enum):
+    """Human readable names for the Zappi and Eddi boost data response."""
     SLOT = "slt"
     START_HOUR = "bsh"
     START_MINUTE = "bsm"
     END_HOUR = "bdh"
     END_MINUTE = "bdm"
     BOOST_DAYS = "bdd"
-
-
-class EddiData(Enum):
-    """Data returned for the Eddi."""
-    DATE = "dat"
-    TIME = "time"
-    SERIAL_NUMBER = "sno"
-    FREQUENCY = "frq"
-    VOLTAGE = "vol"
-    GENERATED_WATTS = "gen"
-    GRID_WATTS = "grd"
-    TIMESTAMP = "timestamp"
-
-
-class HarviData(Enum):
-    """Data returned for the Harvi."""
-    DATE = "dat"
-    TIME = "time"
-    SERIAL_NUMBER = "sno"
-    FIRMWARE_VERSION = "fwv"
-    CT1_NAME = "ectt1"
-    CT2_NAME = "ectt2"
-    CT3_NAME = "ectt3"
-    CT1_WATTS = "ectp1"
-    CT2_WATTS = "ectp2"
-    CT3_WATTS = "ectp3"
-    CT1_PHASE = "ect1p"
-    CT2_PHASE = "ect2p"
-    CT3_PHASE = "ect3p"
-    TIMESTAMP = "timestamp"
-
-
-class MyEnergiResponse(Enum):
-    """A list of the return codes for the myenergi API and the human readable meaning."""
-    Success = 0
-    InvalidID = -1
-    InvalidDSRCommandSequenceNumber = -2
-    NoActionTakenCommandSequenceNumberSameAsLast = -3
-    HubNotFoundNoAssociatedHubRecord = -4
-    InternalError = -5
-    InvalidLoadValue = -6
-    YearMissing = -7
-    MonthMissingOrInvalid = -8
-    DayMissingOrInvalid = -9
-    HourMissingOrInvalid = -10
-    InvalidTTLValue = -11
-    UserNotAuthorizedToPerformOperation = -12
-    SerialNumberNotFound = -13
-    MissingOrBadParameter = -14
-    InvalidPassword = -15
-    NewPasswordsDoNotMatch = -16
-    InvalidNewPassword = -17
-    NewPasswordSameAsOldPassword = -18
-    UserNotRegistered = -19
-    MinuteMissingOrInvalid = -20
-    SlotMissingOrInvalid = -21
-    PriorityBadOrMissing = -22
-    CommandNotAppropriateForDevice = -23
-    CheckPeriodBadOrMissing = -24
-    MinGreenLevelBadOrMissing = -25
-    BusyServerAlreadySendingCommandToDevice = -26
-    RelayNotFitted = -27
-
-
-class WeekDay(Enum):
-    """Human readable names for the days of the week returned in the history statistics."""
-    MONDAY = 'Mon'
-    TUESDAY = 'Tue'
-    WEDNESDAY = 'Wed'
-    THURSDAY = 'Thu'
-    FRIDAY = 'Fri'
-    SATURDAY = 'Sat'
-    SUNDAY = 'Sun'
 
 
 class ZappiStats(Enum):
@@ -345,17 +371,6 @@ class ZappiStats(Enum):
     ZAPPI_IMPORTED = 'h1b'
     HOME_SOLAR = 'hos'
     HOME_GRID = 'hog'
-
-
-class ZappiHistoryTypes(Enum):
-    """Human readable names for the Zappi History Statistics."""
-    imp = "Import"
-    exp = "Export"
-    gen = "Generation"
-    gep = "Generation"
-    h1d = "Charging"
-    h1b = "h1b"
-    hom = "UsedbyHome"
 
 
 @dataclass
@@ -469,7 +484,7 @@ class daily_history:
 
 
 @dataclass
-class boost_time:
+class boosttime:
     """_This dataclass describes the data for a Zappi boost time."""
     slt: int
     bsh: int
@@ -480,14 +495,14 @@ class boost_time:
 
 
 @dataclass
-class boost_times:
+class boosttimes:
     """_This dataclass describes the data returned for a query of Zappi boost times."""
-    boost_times: list[boost_time] = field(default_factory=list)
+    boost_times: list[boosttime] = field(default_factory=list)
 
     def __post_init__(self):
         for index, entry in enumerate(self.boost_times):
             if isinstance(entry, dict):
-                self.boost_times[index] = boost_time(**self.boost_times[index])
+                self.boost_times[index] = boosttime(**self.boost_times[index])
         # Remove boost times which are not valid
         self.boost_times = [boost for boost in self.boost_times if boost.bdd != "00000000"]
 
@@ -497,6 +512,30 @@ class eddi:
     """_This dataclass describes the data returned for a Eddi."""
     dat: date
     tim: time
+    ectp1: int
+    ectp2: int
+    ectt1: str
+    ectt2: str
+    frq: float
+    gen: int
+    grd: int
+    hno: int
+    pha: int
+    sno: int
+    sta: int
+    vol: float
+    ht1: str
+    ht2: str
+    tp1: int
+    tp2: int
+    pri: int
+    cmt: int
+    r1a: int
+    r2a: int
+    r2b: int
+    che: int
+    timestamp: datetime = field(init=False)
+    boost_times: boosttimes = None
 
     def __post_init__(self):
         self.timestamp = datetime.strptime(str(self.dat + self.tim), "%d-%m-%Y%H:%M:%S")
@@ -507,6 +546,43 @@ class libbi:
     """_This dataclass describes the data returned for a Libbi."""
     dat: date
     tim: time
+    batteryDischargingBoost: bool
+    cmt: int
+    div: int
+    dst: int
+    ect1p: int
+    ect2p: int
+    ect3p: int
+    ectp1: int
+    ectp2: int
+    ectp3: int
+    ectp4: int
+    ectp5: int
+    ectt1: str
+    ectt2: str
+    ectt3: str
+    ectt4: str
+    ectt5: str
+    ectt6: str
+    frq: float
+    fwv: str
+    g100LockoutState: str
+    grd: int
+    isp: bool
+    lmo: str
+    mbc: int
+    mic: int
+    newAppAvailable: bool
+    newBootloaderAvailable: bool
+    pha: int
+    pri: int
+    pvDirectlyConnected: bool
+    sno: int
+    soc: int
+    sta: int
+    tz: int
+    vol: int
+    timestamp: datetime = field(init=False)
 
     def __post_init__(self):
         self.timestamp = datetime.strptime(str(self.dat + self.tim), "%d-%m-%Y%H:%M:%S")
@@ -597,7 +673,7 @@ class zappi:
     tbk: int = None
     tbm: range(60) = None
     timestamp: datetime = field(init=False)
-    boost_times: boost_times = None
+    boost_times: boosttimes = None
 
     def __post_init__(self):
         if self.ectt1 == "None":
