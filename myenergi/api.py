@@ -16,29 +16,19 @@ Helper Methods: There are internal helper methods such as _api_request for makin
 for constructing the API URLs, and _check_serial for validating device serial numbers.
 """
 
-import time
-import logging
-import requests
-import requests.auth
 import json
+import logging
+import time
 from datetime import datetime, timedelta
 
-import myenergi.error
-from myenergi.const import (
-    MyEnergiEndpoint,
-    MyenergiType,
-    ZappiData,
-    EddiData,
-    HarviData,
-    LibbiData,
-    ZappiModeParm,
-    ZappiBoost,
-    ZappiMode,
-    History,
-    EddiMode,
-    ZappiStateDisplay,
+import requests
+import requests.auth
 
-)
+import myenergi.error
+from myenergi.const import (EddiData, EddiMode, HarviData, History, LibbiData,
+                            MyEnergiEndpoint, MyenergiType, ZappiBoost,
+                            ZappiData, ZappiMode, ZappiModeParm,
+                            ZappiStateDisplay)
 
 # Only export the myenergi API
 __all__ = ["API"]
@@ -77,7 +67,7 @@ class API:
         for entry in results:
             self._parse_api_results(entry)
         # Get the boost times for all Zappis
-        for serial in self.get_zappi_serials():
+        for serial in self.get_serials(MyenergiType.ZAPPI):
             self._get_zappi_boost_times(serial)
         # Get the boost times for all Eddis
         for serial in self.get_serials(MyenergiType.EDDI):
@@ -138,7 +128,7 @@ class API:
         return getattr(self._devices.eddi[serial], info.value)
 
     def get_serials(self, device: MyenergiType) -> list:
-        """Return a list of serial numbers for the device type passed.
+        """Return a list of serial numbers for the device type passed or an empty list.
 
         Args:
             device (MyenergiType): The type of device to return
@@ -149,15 +139,12 @@ class API:
             return []
 
     def get_zappi_serials(self) -> list:
-        """Return a list of serial numbers for the device type passed.
+        """Return a list of zappi serial numbers or an empty list.
 
         Args:
             device (str): The type of device to return
         """
-        if getattr(self._devices, MyenergiType.ZAPPI.value) is not None:
-            return getattr(self._devices, MyenergiType.ZAPPI.value).keys()
-        else:
-            return []
+        return self.get_serials(MyenergiType.ZAPPI)
 
     def refresh_status(self, device: MyenergiType, serial: int) -> None:
         """Refresh the information stored for a device by calling the myenergi API.

@@ -5,13 +5,13 @@ The script uses argparse to parse and validate a set of input parametes
 It will then set the boost mode according to the parameters passed
 """
 
-import os
 import argparse
 import datetime
 import logging
 import logging.handlers
+import os
 
-import dotenv
+from dotenv import dotenv_values
 
 import myenergi
 
@@ -51,10 +51,12 @@ def get_options() -> dict:
     Returns:
         dict: A dictionary of the options to be used.
     """
-    env = dotenv.dotenv_values(os.path.expanduser('~/.env'))
+    env_path = os.path.expanduser("~/.env")
+    if os.path.exists(env_path):
+        env = dotenv_values(env_path)
     parser = argparse.ArgumentParser(description='Starts and stops Zappi boost using the myenergi API.')
-    parser.add_argument('-s', '--serial', help='myenergi hub serial number', default=env['myenergi_serial'])
-    parser.add_argument('-p', '--password', help='myenergi password', default=env['myenergi_password'])
+    parser.add_argument('-s', '--serial', help='myenergi hub serial number', default=(env.get('myenergi_serial')))
+    parser.add_argument('-p', '--password', help='myenergi password', default=(env.get('myenergi_password')))
     parser.add_argument('-l', '--logger', help='logging mode', default='syslog', choices=['syslog', 'stdout'])
     parser.add_argument('-v', '--verbosity', help='logging verbosity', default=logging.INFO)
     parser.add_argument('-b', '--boost', required=True, choices=myenergi.ZappiBoost._member_names_,

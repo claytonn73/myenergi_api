@@ -514,8 +514,8 @@ class eddi:
     tim: time
     ectp1: int
     ectp2: int
-    ectt1: str
-    ectt2: str
+    ectt1: LoadTypes
+    ectt2: LoadTypes
     frq: float
     gen: int
     grd: int
@@ -558,12 +558,12 @@ class libbi:
     ectp3: int
     ectp4: int
     ectp5: int
-    ectt1: str
-    ectt2: str
-    ectt3: str
-    ectt4: str
-    ectt5: str
-    ectt6: str
+    ectt1: LoadTypes
+    ectt2: LoadTypes
+    ectt3: LoadTypes
+    ectt4: LoadTypes
+    ectt5: LoadTypes
+    ectt6: LoadTypes
     frq: float
     fwv: str
     g100LockoutState: str
@@ -586,6 +586,18 @@ class libbi:
 
     def __post_init__(self):
         self.timestamp = datetime.strptime(str(self.dat + self.tim), "%d-%m-%Y%H:%M:%S")
+        if self.ectt1 == "None":
+            self.ectt1 = None
+        if self.ectt2 == "None":
+            self.ectt2 = None
+        if self.ectt3 == "None":
+            self.ectt3 = None
+        if self.ectt4 == "None":
+            self.ectt4 = None
+        if self.ectt5 == "None":
+            self.ectt5 = None
+        if self.ectt6 == "None":
+            self.ectt6 = None
 
 
 @dataclass

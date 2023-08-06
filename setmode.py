@@ -10,7 +10,7 @@ import logging
 import logging.handlers
 import os
 
-import dotenv
+from dotenv import dotenv_values
 
 import myenergi
 
@@ -40,10 +40,12 @@ def get_options() -> dict:
     Returns:
         dict: A dictionary of the options to be used.
     """
-    env = dotenv.dotenv_values(os.path.expanduser("~/.env"))
+    env_path = os.path.expanduser("~/.env")
+    if os.path.exists(env_path):
+        env = dotenv_values(env_path)
     parser = argparse.ArgumentParser(description='Sets the Zappi mode using the myenergi API')
-    parser.add_argument('-s', '--serial', help='myenergi hub serial number', default=env['myenergi_serial'])
-    parser.add_argument('-p', '--password', help='myenergi password', default=env['myenergi_password'])
+    parser.add_argument('-s', '--serial', help='myenergi hub serial number', default=(env.get('myenergi_serial')))
+    parser.add_argument('-p', '--password', help='myenergi password', default=(env.get('myenergi_password')))
     parser.add_argument('-l', '--logger', help='logging mode', default='syslog', choices=['syslog', 'stdout'])
     parser.add_argument('-v', '--verbosity', help='logging verbosity', default=logging.INFO)
     parser.add_argument('-m', '--mode', help='Desired operating mode for Zappi', required=True,
@@ -55,6 +57,7 @@ def get_options() -> dict:
 def main() -> None:
     """Set the mode for all Zappis as requested if not already set."""
     args = get_options()
+    print(args)
     # Set the logging level for the myenergi api client
     logging.getLogger('myenergi.api').setLevel(args.verbosity)
     # Set up the local logger

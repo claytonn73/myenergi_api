@@ -5,14 +5,14 @@ This script will query the first zappi found to obtain a number of days history 
 It will then import a summary of this information into an influxdb database.
 """
 
-import os
 import argparse
 import logging
 import logging.handlers
+import os
 from datetime import datetime, timedelta
 
-import dotenv
 import influxdb
+from dotenv import dotenv_values
 
 import myenergi
 
@@ -39,10 +39,12 @@ def setup_logger(destination: str = "stdout") -> logging.Logger:
 
 def get_options() -> dict:
     """Get the required options using argparse or from a dotenv file."""
-    env = dotenv.dotenv_values(os.path.expanduser("~/.env"))
+    env_path = os.path.expanduser("~/.env")
+    if os.path.exists(env_path):
+        env = dotenv_values(env_path)
     parser = argparse.ArgumentParser(description='Gets history from the Zappi and imports to influxdb.')
-    parser.add_argument('-s', '--serial', help='myenergi hub serial number', default=env['myenergi_serial'])
-    parser.add_argument('-p', '--password', help='myenergi password', default=env['myenergi_password'])
+    parser.add_argument('-s', '--serial', help='myenergi hub serial number', default=(env.get('myenergi_serial')))
+    parser.add_argument('-p', '--password', help='myenergi password', default=(env.get('myenergi_password')))
     parser.add_argument('-t', '--start', required=False, type=int, default=1, help='starting number of days ago')
     parser.add_argument('-e', '--end', required=False, type=int, default=4, help='ending number of days ago')
     parser.add_argument('-l', '--logger', help='logging mode', default='syslog', choices=['syslog', 'stdout'])
