@@ -1,6 +1,6 @@
 # Myenergi API
 
-This is a package for connecting to the Myenergi API.
+This is a package for connecting to the Myenergi API. It has been tested on Zappi and Harvi data only.
 
 ## Usage
 
