@@ -365,8 +365,8 @@ class ZappiStats(Enum):
     """Human readable names for the Zappi History Statistics."""
     GRID_IMPORTED = 'imp'
     GRID_EXPORTED = 'exp'
-    SOLAR_GENERATED = 'gen'
-    SOLAR_USED = 'gep'
+    SOLAR_GENERATED = 'gep'
+    SOLAR_USED = 'gen'
     ZAPPI_DIVERTED = 'h1d'
     ZAPPI_IMPORTED = 'h1b'
     HOME_SOLAR = 'hos'

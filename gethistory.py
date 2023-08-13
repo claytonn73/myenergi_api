@@ -61,8 +61,8 @@ def main() -> None:
     # Setup the local logger
     logger = setup_logger(args.logger)
     my_influxdb = influxdb.InfluxDBClient(host='localhost', port=8086)
-    # influxdb.drop_database('myenergi')
-    # influxdb.create_database('myenergi')
+    # my_influxdb.drop_database('myenergi')
+    # my_influxdb.create_database('myenergi')
     my_influxdb.switch_database('myenergi')
 
     with myenergi.API(args.serial, args.password) as mye:
