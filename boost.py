@@ -9,31 +9,9 @@ import argparse
 import datetime
 import logging
 import logging.handlers
-import os
-
-from dotenv import dotenv_values
 
 import myenergi
-
-
-def setup_logger(destination='stdout') -> logging.Logger:
-    """Sets up a logger instance of the type specified
-    Args:
-        destination (str, optional): The type of logger instance. Defaults to "stdout".
-    Returns:
-        logger : Logger instance of the type specified
-    """
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    if destination == 'syslog':
-        """Log messages to the syslog."""
-        handler = logging.handlers.SysLogHandler(facility=logging.handlers.SysLogHandler.LOG_DAEMON, address='/dev/log')
-        logger.addHandler(handler)
-        log_format = 'python[%(process)d]: [%(levelname)s] %(filename)s:%(funcName)s:%(lineno)d \"%(message)s\"'
-        handler.setFormatter(logging.Formatter(fmt=log_format))
-    elif destination == 'stdout':
-        logging.getLogger().addHandler(logging.StreamHandler())
-    return logger
+from utilities import get_env, get_logger
 
 
 def valid_time(time_value):
@@ -43,7 +21,7 @@ def valid_time(time_value):
     except ValueError:
         msg = "not a valid time: {0!r}".format(time_value)
         raise argparse.ArgumentTypeError(msg)
-    return input
+    return time_value
 
 
 def get_options() -> dict:
@@ -51,9 +29,7 @@ def get_options() -> dict:
     Returns:
         dict: A dictionary of the options to be used.
     """
-    env_path = os.path.expanduser("~/.env")
-    if os.path.exists(env_path):
-        env = dotenv_values(env_path)
+    env = get_env()
     parser = argparse.ArgumentParser(description='Starts and stops Zappi boost using the myenergi API.')
     parser.add_argument('-s', '--serial', help='myenergi hub serial number', default=(env.get('myenergi_serial')))
     parser.add_argument('-p', '--password', help='myenergi password', default=(env.get('myenergi_password')))
@@ -83,7 +59,7 @@ def main() -> None:
     # Set the logging level for the myenergi api client
     logging.getLogger('myenergi.api').setLevel(args.verbosity)
     # Setup the local logger
-    logger = setup_logger(args.logger)
+    logger = get_logger(args.logger)
 
     with myenergi.API(args.serial, args.password) as mye:
         if mye.get_zappi_serials() is None:

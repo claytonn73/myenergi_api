@@ -5,29 +5,17 @@ This script will query the first zappi found to obtain a number of days history 
 It will then import a summary of this information into an influxdb database.
 """
 
-import os
-import sys
 import argparse
 import logging
-import logging.handlers
 from datetime import datetime
 
-import dotenv
-
 import myenergi
-
-
-def get_logger():
-    """Log message to sysout."""
-    logger = logging.getLogger()
-    logger.addHandler(logging.StreamHandler(sys.stdout))
-    logger.setLevel(logging.INFO)
-    return logger
+from utilities import get_env, get_logger
 
 
 def get_options():
     """Get the required options using argparse or from a dotenv file."""
-    env = dotenv.dotenv_values(os.path.expanduser("~/.env"))
+    env = get_env()
     parser = argparse.ArgumentParser(description='Gets history from the Zappi and imports to influxdb.')
     if "myenergi_serial" not in env:
         parser.add_argument('-s', '--serial', required=True, help='myenergi hub serial number')
@@ -50,7 +38,7 @@ def main():
     logging.getLogger('myenergi.api').setLevel(logging.INFO)
 
     # Setup the local logger
-    logger = get_logger()
+    logger = get_logger(destination = "stdout")
 
     with myenergi.API(args.serial, args.password) as mye:
         zappiserials = mye.get_serials(myenergi.const.MyenergiType.ZAPPI)

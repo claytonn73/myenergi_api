@@ -30,6 +30,10 @@ from myenergi.const import (EddiData, EddiMode, HarviData, History, LibbiData,
                             ZappiData, ZappiMode, ZappiModeParm,
                             ZappiStateDisplay)
 
+# from pprint import pprint
+
+
+
 # Only export the myenergi API
 __all__ = ["API"]
 
@@ -291,7 +295,7 @@ class API:
         """
         self._check_serial(MyenergiType.ZAPPI, serial)
         current_mode = self.get_zappi_info(serial, ZappiData.MODE)
-        if ZappiMode[mode].value == current_mode:
+        if ZappiMode[mode] == current_mode:
             self.logger.info(f"Mode for Zappi SN: {serial} is already {mode}")
         else:
             # set the Zappi mode as requested
@@ -299,7 +303,7 @@ class API:
             self._api_request(self._create_url(endpoint=MyEnergiEndpoint.ZAPPI_MODE, serial=serial,
                                                parm=f"{ZappiModeParm[mode].value}"))
             start_time = time.monotonic()
-            while ZappiMode[mode].value != self.get_zappi_info(serial, ZappiData.MODE):
+            while ZappiMode[mode] != self.get_zappi_info(serial, ZappiData.MODE):
                 time.sleep(3)
                 self.refresh_status(MyenergiType.ZAPPI, serial)
                 if time.monotonic() > (start_time + 60):
@@ -369,10 +373,10 @@ class API:
                 results.raise_for_status()
         except requests.exceptions.HTTPError as err:
             self.close()
-            raise SystemExit(err)
+            raise SystemExit(err) from err
         except requests.exceptions.RequestException as err:
             self.close()
-            raise SystemExit(err)
+            raise SystemExit(err) from err
         # Get the JSON data from the results of the API call.
         data = results.json()
         self.logger.debug(f"Formatted API results:\n {json.dumps(data, indent=2)}")

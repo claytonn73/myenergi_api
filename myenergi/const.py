@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from enum import Enum
+from myenergi.apiconstruct import baseclass
 
 
 class WeekDay(Enum):
@@ -28,6 +29,7 @@ class MyEnergiEndpoint(Enum):
     ZAPPI_HISTORY_MINUTE = "cgi-jday-Z"
     ZAPPI_HISTORY_HOUR = "cgi-jdayhour-Z"
     EDDI = "cgi-jstatus-E"
+    EDDI_MODE = "cgi-eddi-mode-Z"
     EDDI_PRIORITY = "cgi-set-heater-priority-E"
     EDDI_HISTORY_MINUTE = "cgi-jhour-E"
     EDDI_HISTORY_HOUR = "cgi-jday-E"
@@ -420,7 +422,8 @@ class minute_history:
     def __post_init__(self):
         for index, entry in enumerate(self.history_data):
             if isinstance(entry, dict):
-                self.history_data[index] = minute_data(**self.history_data[index])
+                self.history_data[index] = minute_data(
+                    **self.history_data[index])
 
 
 @dataclass
@@ -447,7 +450,8 @@ class hourly_data:
         self.hog = self.imp - self.gen - self.h1b
         self.hos = self.gep - self.exp - self.h1d
         for stat in ZappiStats:
-            setattr(self, stat.value, round(getattr(self, stat.value) / 3600 / 1000, 2))
+            setattr(self, stat.value, round(
+                getattr(self, stat.value) / 3600 / 1000, 2))
 
 
 @dataclass
@@ -459,7 +463,8 @@ class hourly_history:
     def __post_init__(self):
         for index, entry in enumerate(self.history_data):
             if isinstance(entry, dict):
-                self.history_data[index] = hourly_data(**self.history_data[index])
+                self.history_data[index] = hourly_data(
+                    **self.history_data[index])
 
 
 @dataclass
@@ -504,11 +509,12 @@ class boosttimes:
             if isinstance(entry, dict):
                 self.boost_times[index] = boosttime(**self.boost_times[index])
         # Remove boost times which are not valid
-        self.boost_times = [boost for boost in self.boost_times if boost.bdd != "00000000"]
+        self.boost_times = [
+            boost for boost in self.boost_times if boost.bdd != "00000000"]
 
 
 @dataclass
-class eddi:
+class eddi(baseclass):
     """_This dataclass describes the data returned for a Eddi."""
     dat: date
     tim: time
@@ -534,20 +540,22 @@ class eddi:
     r2a: int
     r2b: int
     che: int
-    timestamp: datetime = field(init=False)
+    timestamp: datetime = None
     boost_times: boosttimes = None
 
     def __post_init__(self):
-        self.timestamp = datetime.strptime(str(self.dat + self.tim), "%d-%m-%Y%H:%M:%S")
+        super().__post_init__()
+        self.timestamp = datetime.combine(self.dat, self.tim)
 
 
 @dataclass
-class libbi:
+class libbi(baseclass):
     """_This dataclass describes the data returned for a Libbi."""
     dat: date
     tim: time
     batteryDischargingBoost: bool
     cmt: int
+    deviceClass: str
     div: int
     dst: int
     ect1p: int
@@ -582,26 +590,15 @@ class libbi:
     sta: int
     tz: int
     vol: int
-    timestamp: datetime = field(init=False)
+    timestamp: datetime = None
 
     def __post_init__(self):
-        self.timestamp = datetime.strptime(str(self.dat + self.tim), "%d-%m-%Y%H:%M:%S")
-        if self.ectt1 == "None":
-            self.ectt1 = None
-        if self.ectt2 == "None":
-            self.ectt2 = None
-        if self.ectt3 == "None":
-            self.ectt3 = None
-        if self.ectt4 == "None":
-            self.ectt4 = None
-        if self.ectt5 == "None":
-            self.ectt5 = None
-        if self.ectt6 == "None":
-            self.ectt6 = None
+        super().__post_init__()
+        self.timestamp = datetime.combine(self.dat, self.tim)
 
 
 @dataclass
-class harvi:
+class harvi(baseclass):
     """_This dataclass describes the data returned for a Harvi."""
     dat: date
     tim: time
@@ -616,20 +613,16 @@ class harvi:
     ect1p: int
     ect2p: int
     ect3p: int
-    timestamp: datetime = field(init=False)
+    deviceClass: str
+    timestamp: datetime = None
 
     def __post_init__(self):
-        if self.ectt1 == "None":
-            self.ectt1 = None
-        if self.ectt2 == "None":
-            self.ectt2 = None
-        if self.ectt3 == "None":
-            self.ectt3 = None
-        self.timestamp = datetime.strptime(str(self.dat + self.tim), "%d-%m-%Y%H:%M:%S")
+        super().__post_init__()
+        self.timestamp = datetime.combine(self.dat, self.tim)
 
 
 @dataclass
-class zappi:
+class zappi(baseclass):
     """_This dataclass describes the data returned for a Zappi."""
     bsm: int
     bss: int
@@ -653,23 +646,24 @@ class zappi:
     mgl: int
     pha: int
     pri: int
-    pst: ZappiStatus._member_names_
+    pst: ZappiStatus
     pwm: int
     sbh: range(23)
     sbk: int
     sno: int
-    sta: int
+    sta: ZappiState
     tz: int
     tim: time
     vol: float
     zmo: ZappiMode
     zs: int
-    zsh: ZappiEVStatus._member_names_
+    zsh: ZappiEVStatus
     newAppAvailable: bool
     newBootloaderAvailable: bool
     beingTamperedWith: bool
     batteryDischargeEnabled: bool
     g100LockoutState: str
+    deviceClass: str
     rrac: int = 0
     che: int = 0
     rac: int = 0
@@ -684,23 +678,12 @@ class zappi:
     tbh: range(23) = None
     tbk: int = None
     tbm: range(60) = None
-    timestamp: datetime = field(init=False)
+    timestamp: datetime = None
     boost_times: boosttimes = None
 
     def __post_init__(self):
-        if self.ectt1 == "None":
-            self.ectt1 = None
-        if self.ectt2 == "None":
-            self.ectt2 = None
-        if self.ectt3 == "None":
-            self.ectt3 = None
-        if self.ectt4 == "None":
-            self.ectt4 = None
-        if self.ectt5 == "None":
-            self.ectt5 = None
-        if self.ectt6 == "None":
-            self.ectt6 = None
-        self.timestamp = datetime.strptime(str(self.dat + self.tim), "%d-%m-%Y%H:%M:%S")
+        super().__post_init__()
+        self.timestamp = datetime.combine(self.dat, self.tim)
         # Voltage is supplied as an integer in decivolts so need to divide by 10
         self.vol = round(self.vol/10, 1)
 
