@@ -16,9 +16,7 @@ run(main())
 
 The sample programs use a .env file with the serial and password contained in it
 
-```
+```text
 myenergi_serial = "1234567"
 myenergi_password = "passw0rd"
 ```
-
-

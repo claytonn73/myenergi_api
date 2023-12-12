@@ -89,7 +89,7 @@ class API:
         """Close the requests session."""
         self._session.close()
 
-    def get_zappi_info(self, serial: int, info: ZappiData) -> str:
+    def get_zappi_info(self, serial: int, info: ZappiData) -> str | int:
         """Return the Zappi information previously queried using the API.
 
         Args:
@@ -107,9 +107,8 @@ class API:
         """
         self._check_serial(MyenergiType.ZAPPI, serial)
         myzappi = self._devices.zappi[serial]
-        display_status = ZappiStateDisplay[getattr(myzappi, ZappiData.CHARGE_STATUS.value)
+        return  ZappiStateDisplay[getattr(myzappi, ZappiData.CHARGE_STATUS.value)
                                            + str(getattr(myzappi, ZappiData.STATUS.value))].value
-        return display_status
 
     def get_harvi_info(self, serial: int, info: HarviData) -> str:
         """Return the Harvi information previously queried using the API.
@@ -218,8 +217,8 @@ class API:
         """
         self._check_serial(MyenergiType.EDDI, serial)
         results = self._api_request(self._create_url(endpoint=MyEnergiEndpoint[history_type.value], serial=serial,
-                                                     parm=f"-{str(date)}"))
-        serstring = "U" + str(serial)
+                                                     parm=f"-{date}"))
+        serstring = f"U{serial}"
         if history_type == History.MINUTE:
             myhistory = myenergi.const.minute_history(serial)
             for entry in results[serstring]:
@@ -240,8 +239,8 @@ class API:
         """
         self._check_serial(MyenergiType.ZAPPI, serial)
         results = self._api_request(self._create_url(endpoint=MyEnergiEndpoint[history_type.value], serial=serial,
-                                                     parm=f"-{str(date)}"))
-        serstring = "U" + str(serial)
+                                                     parm=f"-{date}"))
+        serstring = f"U{serial}"
         if history_type == History.MINUTE:
             myhistory = myenergi.const.minute_history(serial)
             for entry in results[serstring]:
@@ -268,7 +267,7 @@ class API:
             self.logger.info(f"Setting minimum green limit for Zappi SN:"
                              f"{serial} to {percentage} from {current_percentage}")
             self._api_request(self._create_url(endpoint=MyEnergiEndpoint.ZAPPI_MINGREEN, serial=serial,
-                                               parm=f"-{str(percentage)}"))
+                                               parm=f"-{percentage}"))
             while percentage != self.get_zappi_info(serial, ZappiData.MINIMUM_GREEN_LIMIT):
                 time.sleep(3)
                 self.refresh_status(MyenergiType.ZAPPI, serial)
@@ -344,13 +343,13 @@ class API:
             if kwh == 0:
                 raise myenergi.error.ParameterError("START boost specified without required values")
             else:
-                parm = f"{ZappiBoost[boost].value}{str(kwh)}-0000"
+                parm = f"{ZappiBoost[boost].value}{kwh}-0000"
                 self.logger.info(f"Starting boost for Zappi SN:{serial} to charge {kwh} kWh")
         elif boost == ZappiBoost.SMART.name:
             if (kwh == 0) or (boost_time is None):
                 raise myenergi.error.ParameterError("SMART boost specified without required values")
             else:
-                parm = f"{ZappiBoost[boost].value}{str(kwh)}-{str(boost_time)}"
+                parm = f"{ZappiBoost[boost].value}{kwh}-{boost_time}"
                 self.logger.info(f"Starting smart boost for Zappi SN: {serial} to charge {kwh} kWh by {boost_time}")
         elif boost == ZappiBoost.STOP.name:
             parm = f"{ZappiBoost[boost].value}"
@@ -398,8 +397,7 @@ class API:
         Returns:
             str: The URL to be used
         """
-        url = f"{self._url}{endpoint.value}{serial}{parm}"
-        return url
+        return f"{self._url}{endpoint.value}{serial}{parm}"
 
     def _check_serial(self, device: MyenergiType, serial: str) -> None:
         """Check whether the serial number exists and is the type of device specified.
